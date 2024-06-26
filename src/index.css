@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.layout {
+  display: grid;
+  grid-template-areas:
+    "main main main"
+    "player player player";
+  grid-template-rows: 1fr auto;
+}
+
+@media (min-width: 768px) {
+  .layout {
+    grid-template-areas:
+      "aside main main"
+      "player player player";
+    grid-template-columns: 350px 1fr;
+    grid-template-rows: 1fr auto;
+  }
+}
+
+.scroll-bar::-webkit-scrollbar {
+  width: 8px;
+  background: #252525;
+  border-radius: 9999px;
+}
