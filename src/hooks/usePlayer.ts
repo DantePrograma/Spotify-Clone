@@ -25,10 +25,12 @@ export const usePlayer = () => {
     const { playList, song } = currentMusic;
 
     if (song && audioRef.current) {
-      const songSrc = `../public/music/${playList?.id}/${song.id}.mp3`;
+      const songSrc = `/music/${playList?.id}/${song.id}.mp3`;
 
       audioRef.current.src = songSrc;
-      audioRef.current?.play();
+      audioRef.current.addEventListener("canplaythrough", async () => {
+        await audioRef.current!.play();
+      });
     }
   }, [currentMusic]);
 
