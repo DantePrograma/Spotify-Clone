@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { usePlayerStore } from "../store/playerStore";
 
 export const usePlayer = () => {
@@ -13,41 +13,78 @@ export const usePlayer = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const previousVolume = useRef(volume);
 
+  // Reproducir o pausar la música según el estado de isPlaying
   useEffect(() => {
-    isPlaying ? audioRef.current?.play() : audioRef.current?.pause();
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.play().catch((error) => {
+          if (error.name !== "AbortError") {
+            console.error("Error playing audio:", error);
+          }
+        });
+      } else {
+        audioRef.current.pause();
+      }
+    }
   }, [isPlaying]);
 
+  // Ajustar el volumen cuando cambie
   useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = volume;
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
   }, [volume]);
 
+  // Cargar y reproducir la nueva canción cuando cambie currentMusic
   useEffect(() => {
     const { playList, song } = currentMusic;
 
+    const handleCanPlayThrough = async () => {
+      if (audioRef.current) {
+        try {
+          await audioRef.current.play();
+        } catch (error) {
+          console.error("Error playing audio:", error);
+        }
+      }
+    };
+
     if (song && audioRef.current) {
       const songSrc = `/music/${playList?.id}/${song.id}.mp3`;
+      const audio = audioRef.current;
 
-      audioRef.current.src = songSrc;
-      audioRef.current.addEventListener("canplaythrough", async () => {
-        await audioRef.current!.play();
-      });
+      audio.src = songSrc;
+      audio.load();
+
+      audio.addEventListener("canplaythrough", handleCanPlayThrough);
+
+      return () => {
+        if (audio) {
+          audio.removeEventListener("canplaythrough", handleCanPlayThrough);
+        }
+      };
     }
   }, [currentMusic]);
 
-  const handleSilencedVolume = () => {
+  // Manejar el volumen silenciado
+  const handleSilencedVolume = useCallback(() => {
     if (volume < 0.1) {
       setVolume(previousVolume.current);
     } else {
       previousVolume.current = volume;
       setVolume(0);
     }
-  };
+  }, [volume, setVolume]);
 
-  const handlePlay = () => {
-    if (currentMusic.playList) setIsPlaying(!isPlaying);
-  };
+  // Alternar la reproducción de música
+  const handlePlay = useCallback(() => {
+    if (currentMusic.playList) {
+      setIsPlaying(!isPlaying);
+    }
+  }, [currentMusic.playList, isPlaying, setIsPlaying]);
 
-  const nextSong = () => {
+  // Pasar a la siguiente canción
+  const nextSong = useCallback(() => {
     if (currentMusic.playList) {
       const currentIndex = currentMusic.songs.findIndex(
         (song) => song.id === currentMusic.song?.id
@@ -63,14 +100,17 @@ export const usePlayer = () => {
         setIsPlaying(true);
       }
     }
-  };
+  }, [currentMusic, setCurrentMusic, setIsPlaying]);
 
-  const previousSong = () => {
+  // Retroceder a la canción anterior
+  const previousSong = useCallback(() => {
     if (currentMusic.playList) {
       const currentIndex = currentMusic.songs.findIndex(
         (song) => song.id === currentMusic.song?.id
       );
-      const previousIndex = (currentIndex - 1) % currentMusic.songs.length;
+      const previousIndex =
+        (currentIndex - 1 + currentMusic.songs.length) %
+        currentMusic.songs.length;
       const previousSong = currentMusic.songs[previousIndex];
       if (previousSong) {
         setCurrentMusic({
@@ -81,17 +121,22 @@ export const usePlayer = () => {
         setIsPlaying(true);
       }
     }
-  };
+  }, [currentMusic, setCurrentMusic, setIsPlaying]);
 
+  // Añadir el evento de pasar a la siguiente canción cuando termine la actual
   useEffect(() => {
     const audioElement = audioRef.current;
 
-    if (audioElement) audioElement.addEventListener("ended", nextSong);
+    if (audioElement) {
+      audioElement.addEventListener("ended", nextSong);
+    }
 
     return () => {
-      if (audioElement) audioElement.removeEventListener("ended", nextSong);
+      if (audioElement) {
+        audioElement.removeEventListener("ended", nextSong);
+      }
     };
-  });
+  }, [nextSong]);
 
   return {
     audioRef,
